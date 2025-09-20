@@ -1,72 +1,91 @@
-# Economic Simulation### Price calculation**: Equilibrium pricing from marginal utility equalization across agents, given initial endowmentsProject - AI Coding Instructions
+# Economic Simulation Project - AI Coding Instructions
 
 ## Project Overview
-This is a modular economic simulation implementing agent-based modeling with economic theory principles. The simulation models rational agents ("Homo Economicus") trading goods on a spatial grid with a central marketplace.
+This is a research-grade economic simulation implementing agent-based modeling with spatial frictions in market economies. The simulation models rational agents trading goods on a spatial grid with centralized marketplace access and movement costs.
 
-## Core Architecture Components
+**📋 Key Reference**: See [SPECIFICATION.md](../SPECIFICATION.md) for the complete technical specification (470+ lines of detailed design).
 
-### 1. Agent System
-- **Agent class**: Implements economic agents with utility functions, inventories, and spatial location
-- **Preference system**: Support multiple utility function types (Cobb-Douglas primary, CES, quasi-linear planned)
-- **Trading logic**: Equilibrium price calculation based on initial endowments, mutual benefit verification
-- **Movement system**: Single-square movement per turn on NxN grid
+## Current Project Status
+- ✅ **Specification Phase Complete**: Comprehensive technical design ready for implementation
+- 🔄 **Implementation Phase**: Core components need to be built from specification  
+- 📋 **Next Milestone**: Phase 1 Walrasian solver with validation scenarios V1-V2
 
-### 2. Spatial Framework
-- **Grid system**: NxN grid where N = 3 × number_of_agents
-- **Home locations**: Random squares outside the 2x2 central marketplace
-- **Marketplace**: Central 2x2 area for agent-marketplace trading
+## Core Architecture (From SPECIFICATION.md)
 
-### 3. Economic Engine
-- **Goods system**: 2A goods types, 3A total quantity per good (A = number of agents)
-- **Inventory management**: Separate agent and home inventories with transfer mechanics
-- **Price calculation**: Equilibrium pricing from supply/demand curves derived from agent preferences and endowments
+### Economic Framework
+- **Three-Phase Development**: Pure Walrasian → Spatial Extensions → Local Price Formation  
+- **Research Focus**: Spatial deadweight loss measurement using money-metric welfare analysis
+- **Key Innovation**: Local-participants equilibrium pricing with constrained execution
 
-## Key Mathematical Concepts
+### Technical Components
+- **Walrasian Solver**: Cobb-Douglas closed forms with numerical fallbacks, price normalization (p₁ ≡ 1)
+- **Spatial Grid**: Agent movement with A* pathfinding, configurable size formula
+- **Market Clearing**: Constrained execution with carry-over order management
+- **Welfare Measurement**: Money-metric utilities (equivalent variation) for interpersonal comparability
 
-### Utility Functions
-- Start with Cobb-Douglas: `U(x) = Π(x_i^α_i)` with random α_i weights and epsilon correction
-- Implement extensible framework for CES, quasi-linear, and other forms
-- Use `numpy` for efficient mathematical operations
+## Current Implementation Priority
 
-### Trading Rules
-- Trade occurs only if both agents improve utility
-- Equilibrium price ratios calculated from marginal utility ratios at equilibrium allocation
-- Prices reflect both initial endowments and agent preferences through utility maximization
-- No haggling or dynamic pricing - agents accept calculated equilibrium prices
+### Phase 1: Pure Walrasian Baseline
+1. **Utility Protocol**: Plugin architecture starting with Cobb-Douglas
+2. **Equilibrium Solver**: scipy.optimize with analytical demand functions  
+3. **Agent System**: Vectorized operations for 100+ agents
+4. **Validation Framework**: Scenarios V1-V2 (Edgeworth verification, spatial null tests)
+
+### Key Mathematical Concepts (Updated)
+
+#### Cobb-Douglas Implementation
+```python
+# Agent i with utility U_i(x) = ∏_j x_j^α_ij and ∑_j α_ij = 1  
+# Demand: x_ij(p, ω_i) = α_ij · (p·ω_i) / p_j
+# Excess demand: Z(p) = ∑_i [x_i(p, ω_i^total) - ω_i^total]
+```
+
+#### Local-Participants Equilibrium (Phase 2)
+- **Price calculation**: Uses total endowments (home + personal) of marketplace participants only
+- **Trade execution**: Constrained by personal inventory, with proportional rationing
+- **Carry-over**: Unexecuted orders repriced at next round's equilibrium
 
 ## Implementation Patterns
 
-### File Structure (Recommended)
+### File Structure (Per SPECIFICATION.md)
 ```
 src/
 ├── agents/
-│   ├── agent.py          # Core Agent class with vectorized operations
-│   ├── utility.py        # Utility function implementations + registry
-│   └── inventory.py      # Inventory management (numpy arrays)
-├── environment/
-│   ├── grid.py          # Spatial grid with spatial hashing (300x300 for 100 agents)
-│   ├── marketplace.py   # Marketplace trading logic
-│   └── home.py          # Home inventory management
+│   ├── agent.py          # Agent with utility, endowments, position
+│   ├── utility.py        # UtilityProtocol + Cobb-Douglas implementation
+│   └── movement.py       # MovementPolicy + A* pathfinding
 ├── economics/
-│   ├── pricing.py       # Equilibrium price calculation (vectorized)
-│   ├── trading.py       # Trading mechanics (batch processing)
-│   ├── goods.py         # Goods initialization and distribution
-│   ├── institutions/    # Future: contracts, property rights, governance
-│   └── mechanisms/      # Future: auction types, bargaining protocols
+│   ├── equilibrium.py    # Walrasian solver with analytical demand functions
+│   ├── market.py         # Market clearing with rationing and carry-over
+│   └── welfare.py        # Money-metric utility measurement
+├── environment/
+│   ├── grid.py          # Spatial grid: configurable size, marketplace detection
+│   └── world.py         # WorldState aggregation
 ├── simulation/
-│   ├── engine.py        # Main simulation loop (performance optimized)
-│   ├── statistics.py    # Data collection and reporting
-│   └── profiling.py     # Performance monitoring and bottleneck detection
-├── extensions/
-│   ├── behavioral/      # Future: bounded rationality, learning
-│   ├── macro/          # Future: money, credit, production
-│   └── social/         # Future: social preferences, networks
+│   ├── engine.py        # Main simulation loop with round-by-round execution
+│   ├── config.py        # YAML configuration loading
+│   └── logging.py       # Parquet data products with git SHA tracking
+├── validation/
+│   ├── scenarios.py     # V1-V8 validation scenario implementations
+│   └── invariants.py    # Economic invariant checking (Walras' Law, conservation)
 └── visualization/
-    └── pygame_display.py # Real-time visualization with performance scaling
+    └── pygame_display.py # Real-time agent movement and trading visualization
 ```
 
-### Dependencies
-- `numpy`: Mathematical operations and utility functions (vectorized for 100+ agents)
+### Economic Invariants (Critical for All Code)
+```python
+# All implementations MUST satisfy these invariants:
+assert np.allclose(endowments_before, endowments_after)  # Conservation
+assert abs(np.dot(prices, excess_demand)) < 1e-8        # Walras' Law  
+assert prices[0] == 1.0                                 # Numéraire (Good 1)
+assert np.all(consumption >= 0)                         # Nonnegativity
+```
+
+### Dependencies (Production)
+- **Core**: `numpy`, `scipy` (optimization for equilibrium solver)
+- **Visualization**: `pygame` (real-time agent movement display)
+- **Data**: Standard library (Parquet logging via pandas when needed)
+- **Performance**: `numba` (optional JIT compilation for bottlenecks)
 - `pygame`: Real-time visualization of agent movement and trading
 - `dataclasses`: Clean data structures for agents, goods, inventories
 - `typing`: Type hints for economic modeling clarity
@@ -78,38 +97,31 @@ src/
 - **Spatial indexing**: Grid-based spatial hashing for O(1) neighbor finding vs O(n²) agent comparisons
 - **Batch processing**: Process all agent movements/trades per turn, not individual agent loops
 - **Memory efficiency**: Pre-allocate arrays for 300×300 grid, avoid dynamic resizing
-- **Profiling hooks**: Built-in timing for trading phases, movement, utility calculations
+### Development Workflow (Per Current Status)
+- **Phase 1 Priority**: Implement Walrasian equilibrium solver and validation scenarios V1-V2  
+- Use `pytest tests/validation/` for economic invariant testing
+- Implement `--headless` mode for batch simulations and CI/CD
+- All data logged to Parquet with reproducible seeds and git SHA tracking
+- See [SPECIFICATION.md](../SPECIFICATION.md) for complete validation framework
 
-### Critical Design Decisions
-1. **Immutable trading**: Agents cannot negotiate prices - they accept equilibrium ratios or don't trade
-2. **Spatial constraints**: Trading only occurs when agents occupy same grid square
-3. **Two-phase marketplace**: First selling excess, then buying with remaining cash
-4. **Modular utility**: Extensible utility function system for economic experimentation
-5. **Performance-first**: All economic logic designed for vectorized numpy operations
+### Testing Priorities (Research-Grade Standards)
+1. **Economic Invariants**: Walras' Law, conservation, budget constraints (failing these fails the simulation)
+2. **Validation Scenarios**: V1 (Edgeworth analytical), V2 (spatial null), V3-V8 (edge cases)  
+3. **Numerical Stability**: Price normalization (p₁ ≡ 1), equilibrium residuals < 1e-8
+4. **Reproducibility**: Deterministic with fixed seeds, identical results across runs
+5. **Performance**: 100+ agents, <30 seconds per 1000 rounds (target for final implementation)
 
-### Economic Model Extensibility Framework
-- **Utility function registry**: Plugin system for new utility functions with validation
-- **Market mechanism plugins**: Support for auctions, bargaining, price discovery beyond equilibrium
-- **Institution modeling**: Framework for adding contracts, property rights, governance
-- **Behavioral extensions**: Hooks for bounded rationality, learning, social preferences
-- **Macroeconomic layers**: Support for money, credit, production functions
+### Critical Implementation Notes
+- **Local-participants equilibrium**: Only marketplace agents used for price calculation (not all agents)
+- **Total endowments**: Price calculation uses home + personal endowments 
+- **Constrained execution**: Trades limited by personal inventory, excess becomes carry-over
+- **Money-metric welfare**: EV measured at Phase-1 price vector p* for comparability
+- **Empty marketplace handling**: Skip price computation when no agents in marketplace
 
-## Development Workflow
-- Use `python -m pytest` for unit testing economic logic
-- Implement `--headless` mode for batch simulations without pygame
-- Profile with `cProfile` and `line_profiler` for 100-agent performance bottlenecks
-- Log all trades and movements for economic analysis
-- Validate utility function properties (monotonicity, convexity where applicable)
-- Economic principle validation: Pareto efficiency, market clearing, conservation laws
-
-## Testing Priorities
-1. **Performance benchmarks**: 100-agent simulations complete within reasonable time (<30s per 1000 turns)
-2. Utility function mathematical properties and registry system
-3. Equilibrium price calculation accuracy under various endowment distributions
-4. Trading logic with edge cases (zero inventories, equal utilities, numerical precision)
-5. Spatial movement and collision detection with spatial hashing validation
-6. Conservation of goods throughout simulation (mass balance verification)
-7. **Economic principle validation**: Test against known microeconomic theorems
+### Key Reference Documents
+- **[SPECIFICATION.md](../SPECIFICATION.md)**: Complete 470+ line technical specification
+- **[README.md](../README.md)**: Project overview and current status
+- **requirements.txt**: Exact dependency versions for reproducibility
 
 ## Economic Validation & Extension Framework
 - **Core principles**: Verify Pareto efficiency, utility maximization, market clearing
