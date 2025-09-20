@@ -644,7 +644,7 @@ def test_movement_regime_optimality():
 
 ## Implementation Examples
 
-The following code sketches are for illustration only. Complete implementations are in `src/` with full documentation:
+The following code sketches are for illustration only. Module stubs have been created in `src/` with TODO markers indicating implementation priorities:
 
 from typing import Tuple, Optional, List
 import numpy as np
