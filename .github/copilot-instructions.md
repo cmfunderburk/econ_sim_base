@@ -1,13 +1,17 @@
 # Economic Simulation Project - AI Coding Instructions
 
 ## Project Overview
-This is a research-grade economic simulation implementing agent-based modeling with spatial frictions in market economies. The simulation models rational agents trading goods on a spatial grid with centralized marketplace access and movement costs.
-
-**📋 Key Reference**: See [SPECIFICATION.md](../SPECIFICATION.md) for the complete technical specification (470+ lines of detailed design).
+This is a research-grade economic simulation implementing agent-based modeling with spatial frictions in market economies. The simulation models rational agents trading goods on 
+a configurable spatial grid with centralized marketplace access and movement costs.                                                                                                            
+**📋 Key References**: 
+- [SPECIFICATION.md](../SPECIFICATION.md) for complete technical specification (600+ lines)
+- [CONTRIBUTING.md](../CONTRIBUTING.md) for development standards and workflows
+- [README.md](../README.md) for project overview and quick-start guide
 
 ## Current Project Status
-- ✅ **Specification Phase Complete**: Comprehensive technical design ready for implementation
-- 🔄 **Implementation Phase**: Core components need to be built from specification  
+- ✅ **Specification Phase Complete**: Bulletproof technical design with configurable marketplace
+- ✅ **Developer Tooling Complete**: Comprehensive development environment and standards
+- 🔄 **Implementation Phase**: Ready for "gloriously boring" Phase 1 implementation  
 - 📋 **Next Milestone**: Phase 1 Walrasian solver with validation scenarios V1-V2
 
 ## Core Architecture (From SPECIFICATION.md)
@@ -19,9 +23,37 @@ This is a research-grade economic simulation implementing agent-based modeling w
 
 ### Technical Components
 - **Walrasian Solver**: Cobb-Douglas closed forms with numerical fallbacks, price normalization (p₁ ≡ 1)
-- **Spatial Grid**: Agent movement with A* pathfinding, configurable size formula
+- **Configurable Spatial Grid**: Agent movement with A* pathfinding, configurable marketplace dimensions (market_width × market_height)
 - **Market Clearing**: Constrained execution with carry-over order management
 - **Welfare Measurement**: Money-metric utilities (equivalent variation) for interpersonal comparability
+- **Robust Numerics**: NaN/Inf guards with adaptive tâtonnement fallback, storage conservation invariants
+
+## Configuration & Development Workflow
+
+### Quick Start Commands (From Makefile)
+```bash
+# Run simulation with specific config and seed
+make run CONFIG=config/edgeworth.yaml SEED=42
+
+# Development workflow
+make test          # Run all tests
+make validate      # Run validation scenarios
+make format        # Code formatting
+make install       # Install all dependencies
+make help          # Show all available commands
+```
+
+### Key Configuration Features
+- **Configurable Marketplace**: `market_width × market_height` decoupled from world size
+- **Tolerance Constants**: Clearly sourced (`SOLVER_TOL=1e-8`, `FEASIBILITY_TOL=1e-10`)
+- **Reproducible Experiments**: Deterministic execution with fixed seeds
+- **Cross-Platform**: Works on Linux, macOS, Windows with identical results
+
+### Development Standards (From CONTRIBUTING.md)
+- **Economic Correctness**: All code must preserve economic invariants
+- **Research-Grade Quality**: Bulletproof numerics with comprehensive validation
+- **Z_market(p) Notation**: Standardized throughout all equations and code
+- **Storage Conservation**: Precise distance logging and invariant checking
 
 ## Current Implementation Priority
 
@@ -37,7 +69,22 @@ This is a research-grade economic simulation implementing agent-based modeling w
 ```python
 # Agent i with utility U_i(x) = ∏_j x_j^α_ij and ∑_j α_ij = 1  
 # Demand: x_ij(p, ω_i) = α_ij · (p·ω_i) / p_j
-# Excess demand: Z(p) = ∑_i [x_i(p, ω_i^total) - ω_i^total]
+# Market excess demand: Z_market(p) = ∑_i [x_i(p, ω_i^total) - ω_i^total]
+# Use Z_market(p) notation consistently throughout all code
+```
+
+#### Numerical Stability (Critical)
+```python
+# NaN/Inf guards with adaptive fallback
+if np.any(np.isnan(prices)) or np.any(np.isinf(prices)):
+    # Fall back to adaptive tâtonnement process
+    prices = fallback_tatonnement_solver(excess_demand_func)
+
+# Storage conservation invariants
+total_endowments_before = np.sum(world.agent_endowments, axis=0)
+# ... simulation step ...
+total_endowments_after = np.sum(world.agent_endowments, axis=0)
+assert np.allclose(total_endowments_before, total_endowments_after, atol=1e-10)
 ```
 
 #### Local-Participants Equilibrium (Phase 2)
@@ -85,20 +132,26 @@ assert np.all(consumption >= 0)                         # Nonnegativity
 - **Core**: `numpy`, `scipy` (optimization for equilibrium solver)
 - **Visualization**: `pygame` (real-time agent movement display)
 - **Data**: Standard library (Parquet logging via pandas when needed)
+- **Configuration**: `pyyaml` (YAML config file support)
 - **Performance**: `numba` (optional JIT compilation for bottlenecks)
-- `pygame`: Real-time visualization of agent movement and trading
-- `dataclasses`: Clean data structures for agents, goods, inventories
-- `typing`: Type hints for economic modeling clarity
-- `numba` (optional): JIT compilation for performance-critical trading calculations
-- `scipy`: Advanced optimization for equilibrium calculations
+
+### Development Dependencies (requirements-dev.txt)
+- **Testing**: `pytest`, `pytest-cov` (economic invariant validation)
+- **Code Quality**: `black`, `isort`, `flake8` (consistent formatting)
+- **Type Checking**: `mypy` (static type analysis)
+- **Documentation**: `sphinx` (research-grade documentation generation)
+- **Profiling**: `line_profiler`, `memory_profiler` (performance analysis)
 
 ### Performance Architecture (Target: 100 agents)
 - **Vectorized operations**: Use numpy arrays for agent properties, inventories, positions
 - **Spatial indexing**: Grid-based spatial hashing for O(1) neighbor finding vs O(n²) agent comparisons
 - **Batch processing**: Process all agent movements/trades per turn, not individual agent loops
 - **Memory efficiency**: Pre-allocate arrays for 300×300 grid, avoid dynamic resizing
-### Development Workflow (Per Current Status)
+### Development Workflow (Enhanced Tooling)
 - **Phase 1 Priority**: Implement Walrasian equilibrium solver and validation scenarios V1-V2  
+- **Quick Commands**: Use `make test`, `make validate`, `make format` for common tasks
+- **Configurable Runs**: `make run CONFIG=config/edgeworth.yaml SEED=42` for reproducible experiments
+- **Economic Standards**: Follow [CONTRIBUTING.md](../CONTRIBUTING.md) for research-grade development practices
 - Use `pytest tests/validation/` for economic invariant testing
 - Implement `--headless` mode for batch simulations and CI/CD
 - All data logged to Parquet with reproducible seeds and git SHA tracking
@@ -119,9 +172,11 @@ assert np.all(consumption >= 0)                         # Nonnegativity
 - **Empty marketplace handling**: Skip price computation when no agents in marketplace
 
 ### Key Reference Documents
-- **[SPECIFICATION.md](../SPECIFICATION.md)**: Complete 470+ line technical specification
-- **[README.md](../README.md)**: Project overview and current status
-- **requirements.txt**: Exact dependency versions for reproducibility
+- **[SPECIFICATION.md](../SPECIFICATION.md)**: Complete 600+ line technical specification with configurable marketplace
+- **[CONTRIBUTING.md](../CONTRIBUTING.md)**: Comprehensive development guide with economic theory standards
+- **[README.md](../README.md)**: Streamlined project overview with implementation focus
+- **[Makefile](../Makefile)**: Development workflow commands and configuration
+- **requirements.txt / requirements-dev.txt**: Exact dependency versions for reproducibility
 
 ## Economic Validation & Extension Framework
 - **Core principles**: Verify Pareto efficiency, utility maximization, market clearing

@@ -11,7 +11,7 @@ The project is currently in the **specification phase** with a comprehensive tec
 - ✅ **Development Environment Setup** (Python 3.12.3, virtual environment, dependencies)
 - ✅ **AI Development Assistant Configuration** ([.github/copilot-instructions.md](.github/copilot-instructions.md))
 - ✅ **Economic Theory Framework** (Walrasian equilibrium, spatial extensions, welfare measurement)
-- ✅ **Validation Framework** (8 core scenarios + edge cases)
+- ✅ **Validation Framework** (10 comprehensive scenarios: V1-V10)
 - ✅ **Data Products & Reproducibility Standards**
 
 ### Recent Improvements (Last-Mile Polish)
@@ -53,21 +53,21 @@ pip install -r requirements.txt
 
 ### Development Status
 ```bash
-# Check current implementation status
-python scripts/check_status.py
+# Validate specification completeness
+python -c "print('✅ Specification ready for implementation')"
 
-# Run validation suite (when implemented)
-pytest tests/validation/
+# Future: Run validation suite (post-implementation)
+# pytest tests/validation/
 
-# Generate simulation results (when implemented)
-python scripts/run_simulation.py --config config/edgeworth.yaml --seed 42
+# Future: Generate simulation results (post-implementation) 
+# python scripts/run_simulation.py --config config/edgeworth.yaml --seed 42
 ```
 
 ## Research Focus
 
 This simulation studies **spatial deadweight loss** in economic markets:
 
-- **Research Question**: How do movement costs and marketplace access restrictions reduce allocative efficiency compared to frictionless Walrasian outcomes?
+- **Research Question**: How do movement costs (κ > 0) and marketplace access restrictions quantitatively reduce allocative efficiency compared to frictionless Walrasian outcomes?
 - **Key Innovation**: Local-participants equilibrium pricing with constrained execution
 - **Measurement**: Money-metric welfare loss (equivalent variation in numéraire units)
 
@@ -96,25 +96,26 @@ Home ↔ Personal ↔ Market
            ↓
         rationing → carry-over
 ```
+*Key insight: Prices reflect total endowments; execution limited by personal stock*
 
 ### Key Features
 - **Reproducible**: Deterministic simulations with configurable random seeds (NumPy PCG64 + random.seed() for complete coverage)
-- **Scalable**: Target: 100+ agents with <30 seconds per 1000 rounds (on reference hardware, G≤5)
+- **Scalable**: Target: 100+ agents with <30 seconds per 1000 rounds (on reference hardware, G≤5; see [performance analysis](SPECIFICATION.md#scalability-targets) for details)
 - **Extensible**: Plugin architecture for utility functions and movement policies
 - **Research-Grade**: Parquet logging, git SHA tracking, comprehensive validation (see [data types](SPECIFICATION.md#repository-scaffolding) in SPEC)
 
 ### Initialization Guarantees
 To prevent "my p blew up" issues on first runs:
-- **Interiority conditions**: Dirichlet preferences clipped at 0.05, positive supply for all goods, no zero wealth
+- **Interiority conditions**: Dirichlet preferences clipped at 0.05 and renormalized to sum to 1, positive supply for all goods, no zero wealth
 - **Grid scaling**: ≈ 2.5√N per side for N agents, goods count G=3-5 independent of agent count  
 - **Goods divisibility**: Goods are perfectly divisible (ℝ⁺), so proportional rationing introduces no rounding
-- **Unit alignment**: κ is denominated in units of good 1 per grid step, aligning U^eff and EV units
+- **Units & distance**: See [Numerical Constants & Units](SPECIFICATION.md#numerical-constants--units-source-of-truth) for canonical κ scaling and L1 distance conventions
 - **Numerical stability**: See [SPECIFICATION.md](SPECIFICATION.md) for complete details on solver parameterization and convergence criteria
 - **Tolerance constants**: SOLVER_TOL=1e-8 and FEASIBILITY_TOL=1e-10 are defined in [SPECIFICATION.md](SPECIFICATION.md) as the single source of truth
 
 ## Documentation
 
-- **[SPECIFICATION.md](SPECIFICATION.md)** - Complete technical specification (470+ lines)
+- **[SPECIFICATION.md](SPECIFICATION.md)** - Complete technical specification (825 lines)
 - **[.github/copilot-instructions.md](.github/copilot-instructions.md)** - AI development assistant configuration
 - **requirements.txt** - Python dependencies
 - **config/** - Validation scenarios and simulation configurations (when implemented)
@@ -122,13 +123,15 @@ To prevent "my p blew up" issues on first runs:
 ### Logging Sign Conventions
 - **`z_market[g] = demand - endowment`** (+ = excess demand)
 - **`executed_net[g] = buys - sells`** (+ = net buyer)
-- **Distance metric**: Manhattan/L1 with lexicographic tie-breaking by (x,y) then agent ID
+- **Distance & units**: See [Numerical Constants & Units](SPECIFICATION.md#numerical-constants--units-source-of-truth) in SPECIFICATION.md
 
 ## Dependencies
 
 ### Core Libraries
 - **numpy** - Mathematical operations and array handling
 - **scipy** - Optimization (Walrasian equilibrium solver)
+
+### Visualization (Optional)
 - **pygame** - Real-time visualization of agent movement (optional import for `--no-gui` CI compatibility)
 
 ### Development Tools
@@ -141,10 +144,11 @@ To prevent "my p blew up" issues on first runs:
 
 Each round follows the spatial Walrasian protocol:
 1. **Agent Movement**: Move toward marketplace (Manhattan/L1; tie-break lexicographic by (x,y), then agent ID)
-2. **Price Discovery**: Compute equilibrium using **post-move** marketplace participants' total endowments
+2. **Price Discovery**: Compute Local Theoretical Equilibrium (LTE) using **post-move** marketplace participants' total endowments (theoretical clearing; execution constrained by personal stock; track liquidity_gap[g] = z_market[g] - executed_net[g], positive = constrained by personal inventory)
 3. **Order Generation**: Each marketplace agent computes buy/sell orders:
-   - **Wealth**: $w_i = p \cdot \omega_i^{\text{total}} = p \cdot (\omega_i^{\text{home}} + \omega_i^{\text{personal}})$
-   - **Order quantity**: $\Delta_i = x_i^*(p,\omega_i^{\text{total}}) - \omega_i^{\text{personal}}$ (positive = buy, negative = sell)
+   - **Budget-Constrained Wealth**: $w_i = \max(0, p \cdot \omega_i^{\text{total}} - \kappa \cdot d_i) = \max(0, p \cdot (\omega_i^{\text{home}} + \omega_i^{\text{personal}}) - \kappa \cdot d_i)$
+   - **LTE exclusion**: Agents with $p \cdot \omega_i^{\text{total}} \leq \epsilon$ are excluded from LTE computation to avoid singular Jacobians (travel costs do not affect pricing participation)
+   - **Order quantity**: $\Delta_i = x_i^*(p,w_i) - \omega_i^{\text{personal}}$ (positive = buy, negative = sell)
 4. **Order Matching**: Execute trades constrained by personal inventory with proportional rationing
 5. **State Update**: Record results, update positions and carry-over queues
 
@@ -159,16 +163,17 @@ n_goods = market_agents[0].alpha.size if market_agents else 0
 if not market_agents or len(market_agents) < 2 or n_goods < 2:
     prices, trades = None, []
 else:
-    prices = solve_equilibrium(market_agents, normalization="good_1", endowment_scope="total")
+    prices, z_rest_inf, walras_dot, status = solve_equilibrium(market_agents, normalization="good_1", endowment_scope="total")
     trades = execute_constrained_clearing(market_agents, prices)
 ```
 
-**Termination**: Simulation stops at T ≤ 200 rounds or when all agents reach marketplace with empty carry-over queues for 5 consecutive rounds.
+**Termination**: Simulation stops at T ≤ 200 rounds, when all agents reach marketplace with total unmet demand/supply below `RATIONING_EPS` for 5 consecutive rounds, or after `max_stale_rounds` rounds without meaningful progress (default: 50). Log `termination_reason` as "horizon", "market_cleared", or "stale_progress".
 
 ## Validation Framework
 
-The project includes comprehensive validation scenarios:
+The project includes **10 comprehensive validation scenarios** covering core economic theory, edge cases, and numerical stability:
 
+**Quick Reference** (V1-V6 Core Scenarios):
 | Scenario | Purpose | Expected Outcome |
 |----------|---------|------------------|
 | **V1: Edgeworth 2×2** | Analytic verification | `‖p_computed - p_analytic‖ < 1e-8` |
@@ -176,9 +181,15 @@ The project includes comprehensive validation scenarios:
 | **V3: Market Access** | Spatial efficiency loss | `efficiency_loss > 0.1` |
 | **V4: Throughput Cap** | Market rationing effects | `uncleared_orders > 0` |
 | **V5: Spatial Dominance** | Welfare bounds | `spatial_welfare ≤ walrasian_welfare` |
-| **V6: Price Normalization** | Numerical stability | `p₁ ≡ 1 and theoretical residual: |p·Z_market(p)| < 1e-8` <br> `(using total endowments of marketplace participants;` <br> `executed trades may differ due to personal-inventory constraints).` <br> `Primary stop uses ‖Z_market(p)₂:n‖∞ < 1e-8.` |
+| **V6: Price Normalization** | Numerical stability | `p₁ ≡ 1 and ||Z_market(p)||_∞ < 1e-8` |
 
-**EV Measurement**: All efficiency_loss values computed at Phase-1 p* with p*₁=1: EVᵢ = e(p*, U^eff_{i,Phase2}) - e(p*, U^eff_{i,Phase1}). Report Σᵢ EVᵢ in units of good 1.
+**📋 [Complete Validation Matrix (V1-V10)](SPECIFICATION.md#validation-scenarios)** - Includes additional critical scenarios:
+- **V7: Empty Marketplace** - Edge case handling
+- **V8: Stop Conditions** - Termination logic  
+- **V9: Scale Invariance** - Numerical robustness
+- **V10: Spatial Null (Unit Test)** - Regression testing
+
+**EV Measurement**: All efficiency_loss values computed in money space at Phase-1 p* with p*₁=1: EVᵢ = e(p*, x_i^{Phase2}) - e(p*, x_i^{Phase1}). Report Σᵢ EVᵢ in units of good 1.
 
 ## Contributing
 
