@@ -373,7 +373,7 @@ Per-round Parquet files with columns:
 - **Economics**: `p[g], z_market[g], executed_net[g], liquidity_gap[g], utility, move_cost, equivalent_variation`
 - **LTE vs Execution**: `z_market[g]` (theoretical excess demand under total endowments) vs `executed_net[g]` (actual executed net trades) vs `liquidity_gap[g] = z_market[g] - executed_net[g]` (first-class liquidity constraint measure)
 - **Sign conventions**: `z_market[g] = demand - endowment` (+ = excess demand), `executed_net[g] = buys - sells` (+ = net buyer), `liquidity_gap[g] > 0` = constrained by personal inventory
-- **Termination tracking**: `termination_reason` ("horizon", "queues_drained", "stale_progress") logged in final round
+- **Termination tracking**: `termination_reason` ("horizon", "market_cleared", "stale_progress") logged in final round
 - **Metadata**: `git_sha, config_hash, random_seed`
 
 ### Reproducibility Guarantees
